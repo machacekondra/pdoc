@@ -1033,6 +1033,33 @@ class Class (Doc):
         idents = dict(inspect.getmembers(self.cls))
         return dict([(n, o) for n, o in idents.items() if exported(n)])
 
+    def html(self, module, external_links=False, link_prefix='',
+             source=True, **kwargs):
+        """
+        Returns the documentation for this module as
+        self-contained HTML.
+
+        If `external_links` is `True`, then identifiers to external
+        modules are always turned into links.
+
+        If `link_prefix` is `True`, then all links will have that
+        prefix. Otherwise, links are always relative.
+
+        If `source` is `True`, then source code will be retrieved for
+        every Python object whenever possible. This can dramatically
+        decrease performance when documenting large modules.
+
+        `kwargs` is passed to the `mako` render function.
+        """
+        t = _get_tpl('/class.mako')
+        t = t.render(module=module,
+                     theclass=self,
+                     external_links=external_links,
+                     link_prefix=link_prefix,
+                     show_source_code=source,
+                     **kwargs)
+        return t.strip()
+
 
 class Function (Doc):
     """

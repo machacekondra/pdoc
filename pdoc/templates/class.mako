@@ -68,7 +68,7 @@
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
-    ss, stderr = p.communicate(input=s.strip())
+    s, stderr = p.communicate(input=s.strip())
     if p.wait() != 0:
 	print ("-=-=-=-= ERROR =-=-=-=-=-=--=")
 	print ("stderr: %s", stderr)
@@ -77,7 +77,8 @@
 	print ("-=-=-=-=-=-=-=-=-=-=-=-=-=--=")
 	return ''
         #raise RuntimeError('Failed to execute asciidoc. ', stderr)
-    return ss
+
+    return s
 
   def glimpse(s, length=100):
     if len(s) < length:
@@ -264,58 +265,56 @@
     </p>
   % endif
 
-  <header id="section-intro">
-  <h1 class="title"><span class="name">${module.name}</span> module</h1>
-  ${module.docstring | mark}
-  ${show_source(module)}
-  </header>
-
-  <section id="section-items">
-    % if len(variables) > 0:
-    <h2 class="section-title" id="header-variables">Module variables</h2>
-    % for v in variables:
-      <div class="item">
-      <p id="${v.refname}" class="name">var ${ident(v.name)}</p>
-      ${show_desc(v)}
-      </div>
-    % endfor
-    % endif
-
-    % if len(functions) > 0:
-    <h2 class="section-title" id="header-functions">Functions</h2>
-    % for f in functions:
-      ${show_func(f)}
-    % endfor
-    % endif
-
-    % if len(classes) > 0:
-    <h2 class="section-title" id="header-classes">Classes</h2>
-    % for c in classes:
       <%
-      class_vars = c.class_variables()
-      smethods = c.functions()
-      inst_vars = c.instance_variables()
-      methods = c.methods()
-      mro = c.module.mro(c)
+      class_vars = theclass.class_variables()
+      smethods = theclass.functions()
+      inst_vars = theclass.instance_variables()
+      methods = theclass.methods()
+      mro = theclass.module.mro(theclass)
       %>
-      <div class="item">
-      <p id="${c.refname}" class="name">class <a href=${module.name}/${c.name}.html>${ident(c.name)}</a></p>
-      ${show_desc(c)}
-      <br/>
+      <div class="class">
+        % if len(mro) > 0:
+          <h3>Ancestors (in MRO)</h3>
+          <ul class="class_list">
+          % for cls in mro:
+          <li>${link(cls.refname)}</li>
+          % endfor
+          </ul>
+        % endif
+        % if len(class_vars) > 0:
+          <h3>Class variables</h3>
+          % for v in class_vars:
+            <div class="item">
+            <p id="${v.refname}" class="name">var ${ident(v.name)}</p>
+            ${show_inheritance(v)}
+            ${show_desc(v)}
+            </div>
+          % endfor
+        % endif
+        % if len(smethods) > 0:
+          <h3>Static methods</h3>
+          % for f in smethods:
+            ${show_func(f)}
+          % endfor
+        % endif
+        % if len(inst_vars) > 0:
+          <h3>Instance variables</h3>
+          % for v in inst_vars:
+            <div class="item">
+            <p id="${v.refname}" class="name">var ${ident(v.name)}</p>
+            ${show_inheritance(v)}
+            ${show_desc(v)}
+            </div>
+          % endfor
+        % endif
+        % if len(methods) > 0:
+          <h3>Methods</h3>
+          % for f in methods:
+            ${show_func(f)}
+          % endfor
+        % endif
       </div>
-    % endfor
-    % endif
 
-    % if len(submodules) > 0:
-    <h2 class="section-title" id="header-submodules">Sub-modules</h2>
-    % for m in submodules:
-      <div class="item">
-      <p class="name">${link(m.refname)}</p>
-      ${show_desc(m, limit=300)}
-      </div>
-    % endfor
-    % endif
-  </section>
 </%def>
 
 <%def name="module_index(module)">
@@ -341,13 +340,17 @@
     % endif
 
     % if len(classes) > 0:
-    <li class="set"><h3><a href="#header-classes">Classes</a></h3>
+    <li class="set"><h3><a href="#header-classes">Class</a></h3>
       <ul>
-      % for c in classes:
         <li class="mono">
-        <span class="class_name">${link(c.refname)}</span>
+        <span class="class_name"><a href=${theclass.name}.html>${theclass.name}</a></span>
+        <%
+          methods = theclass.functions() + theclass.methods()
+        %>
+        % if len(methods) > 0:
+          ${show_column_list(map(lambda f: link(f.refname), methods))}
+        % endif
         </li>
-      % endfor
       </ul>
     </li>
     % endif

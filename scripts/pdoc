@@ -329,8 +329,8 @@ def html_out(m, html=True):
     if not html:
         f = module_file(m).replace(".html", ".md")
     dirpath = path.dirname(f)
-    if not os.access(dirpath, os.R_OK):
-        os.makedirs(dirpath)
+    if not os.access('%s/%s' % (dirpath, m.name), os.R_OK):
+        os.makedirs('%s/%s' % (dirpath, m.name))
     try:
         with codecs.open(f, 'w+', 'utf-8') as w:
             if not html:
@@ -341,6 +341,25 @@ def html_out(m, html=True):
                              http_server=args.http_html,
                              source=not args.html_no_source)
             print(out, file=w)
+        for c in m.classes():
+            if not html:
+                out = c.text()
+            else:
+                out = c.html(
+                    module=m,
+                    external_links=args.external_links,
+                    link_prefix=args.link_prefix,
+                    http_server=args.http_html,
+                    source=not args.html_no_source
+                )
+
+            with codecs.open(
+                '%s/%s/%s.html' % (dirpath, m.name, c.name),
+                'w+',
+                'utf-8',
+            ) as w:
+                print(out, file=w)
+
     except Exception:
         try:
             os.unlink(f)

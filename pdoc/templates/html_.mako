@@ -1,10 +1,17 @@
 <%
-  import pdoc
   import re
-  import subprocess
   import sys
 
-  use_pygments = False
+  import markdown
+  try:
+    import pygments
+    import pygments.formatters
+    import pygments.lexers
+    use_pygments = True
+  except ImportError:
+    use_pygments = False
+
+  import pdoc
 
   # From language reference, but adds '.' to allow fully qualified names.
   pyident = re.compile('^[a-zA-Z_][a-zA-Z0-9_.]+$')
@@ -58,26 +65,11 @@
     if not module_list:
       s, _ = re.subn('`[^`]+`', linkify, s)
 
-    p = subprocess.Popen(
-        [
-            'asciidoc',
-            '--no-header-footer',
-            '-',
-        ],
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
-    ss, stderr = p.communicate(input=s.strip())
-    if p.wait() != 0:
-	print ("-=-=-=-= ERROR =-=-=-=-=-=--=")
-	print ("stderr: %s", stderr)
-	print ("stdout: %s", ss)
-	print ("stdin: %s", s.strip())
-	print ("-=-=-=-=-=-=-=-=-=-=-=-=-=--=")
-	return ''
-        #raise RuntimeError('Failed to execute asciidoc. ', stderr)
-    return ss
+    extensions = []
+    if use_pygments:
+      extensions = ['markdown.extensions.codehilite(linenums=False)']
+    s = markdown.markdown(s.strip(), extensions=extensions)
+    return s
 
   def glimpse(s, length=100):
     if len(s) < length:
@@ -299,10 +291,9 @@
       mro = c.module.mro(c)
       %>
       <div class="item">
-      <p id="${c.refname}" class="name">class <a href=${module.name}/${c.name}.html>${ident(c.name)}</a></p>
+      <p id="${c.refname}" class="name">class ${ident(c.name)}</p>
       ${show_desc(c)}
-      <br/>
-      </div>
+
     % endfor
     % endif
 
@@ -346,6 +337,12 @@
       % for c in classes:
         <li class="mono">
         <span class="class_name">${link(c.refname)}</span>
+        <%
+          methods = c.functions() + c.methods()
+        %>
+        % if len(methods) > 0:
+          ${show_column_list(map(lambda f: link(f.refname), methods))}
+        % endif
         </li>
       % endfor
       </ul>
