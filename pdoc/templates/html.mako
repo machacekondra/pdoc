@@ -1,17 +1,9 @@
 <%
   import re
   import sys
-
-  import markdown
-  try:
-    import pygments
-    import pygments.formatters
-    import pygments.lexers
-    use_pygments = True
-  except ImportError:
-    use_pygments = False
-
+  import subprocess
   import pdoc
+  import pygments
 
   # From language reference, but adds '.' to allow fully qualified names.
   pyident = re.compile('^[a-zA-Z_][a-zA-Z0-9_.]+$')
@@ -44,12 +36,10 @@
         base_indent = len(indent.match(lines[0]).group(0))
         break
     lines = [line[base_indent:] for line in lines]
-    if not use_pygments:  # :-(
-      return '<pre><code>%s</code></pre>' % (''.join(lines))
-
     pylex = pygments.lexers.PythonLexer()
     htmlform = pygments.formatters.HtmlFormatter(cssclass='codehilite')
     return pygments.highlight(''.join(lines), pylex, htmlform)
+
 
   def linkify(match):
     matched = match.group(0)
@@ -59,17 +49,34 @@
       return matched
     return '[`%s`](%s)' % (name, url)
 
-  def mark(s, linky=True):
-    if linky:
-      s, _ = re.subn('\b\n\b', ' ', s)
+  def mark(s, linky=False):
+    s = decode(s)
     if not module_list:
       s, _ = re.subn('`[^`]+`', linkify, s)
 
-    extensions = []
-    if use_pygments:
-      extensions = ['markdown.extensions.codehilite(linenums=False)']
-    s = markdown.markdown(s.strip(), extensions=extensions)
-    return s
+    p = subprocess.Popen(
+        [
+            'asciidoctor',
+            '-a',
+            'source-highlighter=pygments',
+            '-a',
+            'pygments-css=style',
+            '--no-header-footer',
+            '-',
+        ],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    try:
+        ss, _ = p.communicate(input=decode(s.strip()))
+        if p.wait() != 0:
+            ss = ss if ss else ''
+    except Exception as e:
+        print s
+        print e
+        return ''
+    return decode(ss)
 
   def glimpse(s, length=100):
     if len(s) < length:
@@ -155,21 +162,13 @@
       return refname
     return '<a href="%s">%s</a>' % (url, name)
 %>
-<%def name="show_source(d)">
-  % if show_source_code and d.source is not None and len(d.source) > 0:
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('${sourceid(d)}', this);">Show source &equiv;</a></p>
-  <div id="${sourceid(d)}" class="source">
-    ${decode(clean_source_lines(d.source))}
-  </div>
-  % endif
-</%def>
 
 <%def name="show_desc(d, limit=None)">
   <%
   inherits = (hasattr(d, 'inherits')
            and (len(d.docstring) == 0
             or d.docstring == d.inherits.docstring))
-  docstring = (d.inherits.docstring if inherits else d.docstring).strip()
+  docstring = decode((d.inherits.docstring if inherits else d.docstring).strip())
   if limit is not None:
     docstring = glimpse(docstring, limit)
   %>
@@ -179,9 +178,6 @@
   % else:
     <div class="desc">${docstring | mark}</div>
   % endif
-  % endif
-  % if not isinstance(d, pdoc.Module):
-  <div class="source_cont">${show_source(d)}</div>
   % endif
 </%def>
 
@@ -259,7 +255,6 @@
   <header id="section-intro">
   <h1 class="title"><span class="name">${module.name}</span> module</h1>
   ${module.docstring | mark}
-  ${show_source(module)}
   </header>
 
   <section id="section-items">
@@ -428,11 +423,9 @@
   ${css.pdoc()}
   </style>
 
-  % if use_pygments:
   <style type="text/css">
-  ${pygments.formatters.HtmlFormatter().get_style_defs('.codehilite')}
+  ${pygments.formatters.HtmlFormatter().get_style_defs('.highlight')}
   </style>
-  % endif
 
   <style type="text/css">
   ${css.post()}
@@ -452,6 +445,7 @@
     }
   }
   </script>
+  <link rel="stylesheet" href="http://www.w3schools.com/lib/w3.css">
 </head>
 <body>
 <a href="#" id="top">Top</a>
